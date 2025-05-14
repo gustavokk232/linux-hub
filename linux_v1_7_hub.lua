@@ -1,6 +1,12 @@
--- GUI principal
-local plr = game.Players.LocalPlayer
-local gui = Instance.new("ScreenGui", plr:WaitForChild("PlayerGui"))
+-- Arquivo: BladeBallAutoParry.lua
+
+--// Serviços e Jogador
+local Players = game:GetService("Players")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local player = Players.LocalPlayer
+
+--// GUI
+local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 gui.Name = "Linuxv1_5"
 
 local frame = Instance.new("Frame", gui)
@@ -35,7 +41,6 @@ fpsLabel.TextScaled = true
 fpsLabel.BackgroundTransparency = 1
 fpsLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
 
--- Botão para ativar/desativar
 local toggleBtn = Instance.new("TextButton", frame)
 toggleBtn.Size = UDim2.new(1, -20, 0, 30)
 toggleBtn.Position = UDim2.new(0, 10, 0, 110)
@@ -45,87 +50,100 @@ toggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleBtn.BorderSizePixel = 0
 
--- Estado de ativação
+local closeBtn = Instance.new("TextButton", frame)
+closeBtn.Size = UDim2.new(0, 25, 0, 25)
+closeBtn.Position = UDim2.new(1, -30, 0, 5)
+closeBtn.Text = "X"
+closeBtn.TextScaled = true
+closeBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.BorderSizePixel = 0
+
+closeBtn.MouseButton1Click:Connect(function()
+    gui:Destroy()
+end)
+
+--// Estado
 local parryEnabled = true
 toggleBtn.MouseButton1Click:Connect(function()
     parryEnabled = not parryEnabled
     toggleBtn.Text = "Auto Parry: " .. (parryEnabled and "ON" or "OFF")
 end)
 
--- Campo de força visual
+--// Campo de força visual
 local forcePart = Instance.new("Part")
 forcePart.Anchored = true
 forcePart.CanCollide = false
 forcePart.Shape = Enum.PartType.Ball
-forcePart.Transparency = 0.7
+forcePart.Transparency = 1
 forcePart.Material = Enum.Material.ForceField
 forcePart.Color = Color3.fromRGB(255, 0, 0)
 forcePart.Parent = workspace
 
--- FPS monitor
-local fps = 60
+--// FPS Monitor
 spawn(function()
     while task.wait(1) do
         local last = tick()
         local count = 0
-        for i = 1, 60 do
-            task.wait()
-            count += 1
-        end
+        for i = 1, 60 do task.wait() count += 1 end
         local delta = tick() - last
-        fps = math.floor(count / delta)
-        fpsLabel.Text = "FPS: " .. fps
+        fpsLabel.Text = "FPS: " .. math.floor(count / delta)
     end
 end)
 
--- Parry função
+--// Função de parry
 local function parry()
-    local vim = game:GetService("VirtualInputManager")
-    vim:SendKeyEvent(true, "F", false, game)
-    task.wait(0.1)
-    vim:SendKeyEvent(false, "F", false, game)
+    VirtualInputManager:SendKeyEvent(true, "F", false, game)
+    task.wait(0.05)
+    VirtualInputManager:SendKeyEvent(false, "F", false, game)
 end
 
--- Loop principal
-while task.wait(0.05) do
-    local char = plr.Character
-    if not parryEnabled or not char or not char:FindFirstChild("HumanoidRootPart") then
-        forcePart.Transparency = 1
-        status.Text = "Parry: Inativo ou morto"
-        continue
-    end
+--// Loop principal
+spawn(function()
+    while task.wait(0.03) do
+        local char = player.Character
+        if not parryEnabled or not char or not char:FindFirstChild("HumanoidRootPart") then
+            forcePart.Transparency = 1
+            status.Text = "Parry: Inativo ou morto"
+            continue
+        end
 
-    local hrp = char.HumanoidRootPart
-    local balls = workspace:FindFirstChild("Balls")
-    local closest, minDist, velocity = nil, math.huge, nil
+        local hrp = char.HumanoidRootPart
+        local balls = workspace:FindFirstChild("Balls")
+        local closest, minDist, velocity = nil, math.huge, nil
 
-    if balls then
-        for _, ball in ipairs(balls:GetChildren()) do
-            if ball:IsA("BasePart") then
-                local dist = (ball.Position - hrp.Position).Magnitude
-                if dist < minDist and ball.Velocity.Magnitude > 10 then
-                    closest = ball
-                    minDist = dist
-                    velocity = ball.Velocity.Magnitude
+        if balls then
+            for _, ball in ipairs(balls:GetChildren()) do
+                if ball:IsA("BasePart") then
+                    local toPlayer = (hrp.Position - ball.Position).Unit
+                    local ballVelocity = ball.Velocity
+                    local dot = toPlayer:Dot(ballVelocity.Unit)
+                    local dist = (ball.Position - hrp.Position).Magnitude
+
+                    if dot > 0.7 and dist < minDist and ballVelocity.Magnitude > 10 then
+                        closest = ball
+                        minDist = dist
+                        velocity = ballVelocity.Magnitude
+                    end
                 end
             end
         end
-    end
 
-    if closest then
-        -- Campo de força visual
-        local radius = math.clamp(velocity / 5, 6, 30)
-        forcePart.Position = hrp.Position
-        forcePart.Size = Vector3.new(radius, radius, radius)
-        forcePart.Transparency = 0.3
+        if closest then
+            local radius = math.clamp(velocity / 5, 6, 30)
+            forcePart.Position = hrp.Position
+            forcePart.Size = Vector3.new(radius, radius, radius)
+            forcePart.Transparency = 0.3
 
-        status.Text = "Parry: Pronto (" .. math.floor(minDist) .. " studs)"
-        if minDist <= radius then
-            parry()
-            status.Text = "Parry: EXECUTADO"
+            status.Text = "Parry: Pronto (" .. math.floor(minDist) .. " studs)"
+
+            if minDist <= radius then
+                parry()
+                status.Text = "Parry: EXECUTADO"
+            end
+        else
+            forcePart.Transparency = 1
+            status.Text = "Parry: Aguardando bola"
         end
-    else
-        status.Text = "Parry: Aguardando bola"
-        forcePart.Transparency = 1
     end
-end
+end)
