@@ -2,6 +2,7 @@
 
 --// Serviços e Jogador
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local player = Players.LocalPlayer
 
@@ -17,6 +18,7 @@ frame.BackgroundTransparency = 0.2
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
+frame.Visible = true
 
 local title = Instance.new("TextLabel", frame)
 title.Size = UDim2.new(1, 0, 0, 30)
@@ -50,17 +52,19 @@ toggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleBtn.BorderSizePixel = 0
 
-local closeBtn = Instance.new("TextButton", frame)
-closeBtn.Size = UDim2.new(0, 25, 0, 25)
-closeBtn.Position = UDim2.new(1, -30, 0, 5)
-closeBtn.Text = "X"
-closeBtn.TextScaled = true
-closeBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
-closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-closeBtn.BorderSizePixel = 0
+-- Botão de minimizar externo
+local toggleUI = Instance.new("TextButton", gui)
+toggleUI.Size = UDim2.new(0, 100, 0, 30)
+toggleUI.Position = UDim2.new(0, 10, 0, 200)
+toggleUI.Text = "Mostrar GUI"
+toggleUI.TextScaled = true
+toggleUI.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+toggleUI.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleUI.BorderSizePixel = 0
 
-closeBtn.MouseButton1Click:Connect(function()
-    gui:Destroy()
+toggleUI.MouseButton1Click:Connect(function()
+    frame.Visible = not frame.Visible
+    toggleUI.Text = frame.Visible and "Ocultar GUI" or "Mostrar GUI"
 end)
 
 --// Estado
@@ -85,65 +89,63 @@ spawn(function()
     while task.wait(1) do
         local last = tick()
         local count = 0
-        for i = 1, 60 do task.wait() count += 1 end
+        for i = 1, 60 do RunService.Heartbeat:Wait() count += 1 end
         local delta = tick() - last
         fpsLabel.Text = "FPS: " .. math.floor(count / delta)
     end
 end)
 
---// Função de parry
+--// Função de parry (rápida)
 local function parry()
     VirtualInputManager:SendKeyEvent(true, "F", false, game)
-    task.wait(0.05)
+    RunService.Heartbeat:Wait()
     VirtualInputManager:SendKeyEvent(false, "F", false, game)
 end
 
 --// Loop principal
-spawn(function()
-    while task.wait(0.03) do
-        local char = player.Character
-        if not parryEnabled or not char or not char:FindFirstChild("HumanoidRootPart") then
-            forcePart.Transparency = 1
-            status.Text = "Parry: Inativo ou morto"
-            continue
-        end
+RunService.Heartbeat:Connect(function()
+    local char = player.Character
+    if not parryEnabled or not char or not char:FindFirstChild("HumanoidRootPart") then
+        forcePart.Transparency = 1
+        status.Text = "Parry: Inativo ou morto"
+        return
+    end
 
-        local hrp = char.HumanoidRootPart
-        local balls = workspace:FindFirstChild("Balls")
-        local closest, minDist, velocity = nil, math.huge, nil
+    local hrp = char.HumanoidRootPart
+    local balls = workspace:FindFirstChild("Balls")
+    local closest, minDist, velocity = nil, math.huge, nil
 
-        if balls then
-            for _, ball in ipairs(balls:GetChildren()) do
-                if ball:IsA("BasePart") then
-                    local toPlayer = (hrp.Position - ball.Position).Unit
-                    local ballVelocity = ball.Velocity
-                    local dot = toPlayer:Dot(ballVelocity.Unit)
-                    local dist = (ball.Position - hrp.Position).Magnitude
+    if balls then
+        for _, ball in ipairs(balls:GetChildren()) do
+            if ball:IsA("BasePart") then
+                local toPlayer = (hrp.Position - ball.Position).Unit
+                local ballVelocity = ball.Velocity
+                local dot = toPlayer:Dot(ballVelocity.Unit)
+                local dist = (ball.Position - hrp.Position).Magnitude
 
-                    if dot > 0.7 and dist < minDist and ballVelocity.Magnitude > 10 then
-                        closest = ball
-                        minDist = dist
-                        velocity = ballVelocity.Magnitude
-                    end
+                if dot > 0.7 and dist < minDist and ballVelocity.Magnitude > 10 then
+                    closest = ball
+                    minDist = dist
+                    velocity = ballVelocity.Magnitude
                 end
             end
         end
+    end
 
-        if closest then
-            local radius = math.clamp(velocity / 5, 6, 30)
-            forcePart.Position = hrp.Position
-            forcePart.Size = Vector3.new(radius, radius, radius)
-            forcePart.Transparency = 0.3
+    if closest then
+        local radius = math.clamp(velocity / 5, 6, 30)
+        forcePart.Position = hrp.Position
+        forcePart.Size = Vector3.new(radius, radius, radius)
+        forcePart.Transparency = 0.3
 
-            status.Text = "Parry: Pronto (" .. math.floor(minDist) .. " studs)"
+        status.Text = "Parry: Pronto (" .. math.floor(minDist) .. " studs)"
 
-            if minDist <= radius then
-                parry()
-                status.Text = "Parry: EXECUTADO"
-            end
-        else
-            forcePart.Transparency = 1
-            status.Text = "Parry: Aguardando bola"
+        if minDist <= radius then
+            parry()
+            status.Text = "Parry: EXECUTADO"
         end
+    else
+        forcePart.Transparency = 1
+        status.Text = "Parry: Aguardando bola"
     end
 end)
