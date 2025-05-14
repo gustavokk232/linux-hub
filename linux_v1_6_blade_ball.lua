@@ -1,78 +1,84 @@
--- Linux v1.6 - Auto Parry simples e eficaz
+-- GUI principal
+local plr = game.Players.LocalPlayer
+local gui = Instance.new("ScreenGui", plr:WaitForChild("PlayerGui"))
+gui.Name = "Linuxv1_5"
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local VirtualInputManager = game:GetService("VirtualInputManager")
-local UIS = game:GetService("UserInputService")
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 240, 0, 180)
+frame.Position = UDim2.new(0, 10, 0, 10)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+frame.BackgroundTransparency = 0.2
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
 
-local player = Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
-gui.Name = "Linux16_UI"
-gui.ResetOnSpawn = false
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, 0, 0, 30)
+title.Text = "Linux v1.5"
+title.TextScaled = true
+title.BackgroundTransparency = 1
+title.TextColor3 = Color3.fromRGB(138, 43, 226)
 
--- UI básica
-local button = Instance.new("TextButton", gui)
-button.Size = UDim2.new(0, 160, 0, 50)
-button.Position = UDim2.new(0, 10, 0, 10)
-button.Text = "Ativar Auto Parry"
-button.TextScaled = true
-button.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-button.TextColor3 = Color3.fromRGB(0, 255, 127)
-button.BorderSizePixel = 0
-button.Active = true
-button.Draggable = true
+local status = Instance.new("TextLabel", frame)
+status.Size = UDim2.new(1, -10, 0, 25)
+status.Position = UDim2.new(0, 5, 0, 35)
+status.Text = "Parry: Esperando..."
+status.TextScaled = true
+status.BackgroundTransparency = 1
+status.TextColor3 = Color3.fromRGB(255, 255, 255)
 
--- Função de parry
-local function doParry()
-    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
-    wait(0.1)
-    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
-end
+local fpsLabel = Instance.new("TextLabel", frame)
+fpsLabel.Size = UDim2.new(1, -10, 0, 25)
+fpsLabel.Position = UDim2.new(0, 5, 0, 65)
+fpsLabel.Text = "FPS: Calculando..."
+fpsLabel.TextScaled = true
+fpsLabel.BackgroundTransparency = 1
+fpsLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
 
--- Detectar bola
-local function findBall()
-    local hrp = character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
+-- Botão para ativar/desativar
+local toggleBtn = Instance.new("TextButton", frame)
+toggleBtn.Size = UDim2.new(1, -20, 0, 30)
+toggleBtn.Position = UDim2.new(0, 10, 0, 110)
+toggleBtn.Text = "Auto Parry: ON"
+toggleBtn.TextScaled = true
+toggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleBtn.BorderSizePixel = 0
 
-    local closest, distance = nil, math.huge
-    for _, obj in pairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") and obj.Name:lower():find("ball") and obj.Velocity.Magnitude > 5 then
-            local dist = (obj.Position - hrp.Position).Magnitude
-            if dist < distance then
-                closest = obj
-                distance = dist
-            end
-        end
-    end
-    return closest, distance
-end
-
--- Loop de parry
-local running = false
-local function startParryLoop()
-    RunService:UnbindFromRenderStep("LinuxParry")
-    if running then
-        running = false
-        button.Text = "Ativar Auto Parry"
-        return
-    end
-
-    running = true
-    button.Text = "Desativar Auto Parry"
-
-    RunService:BindToRenderStep("LinuxParry", Enum.RenderPriority.Character.Value, function()
-        local ball, dist = findBall()
-        if ball and dist < 13 then
-            doParry()
-        end
-    end)
-end
-
-button.MouseButton1Click:Connect(startParryLoop)
-
--- Reinício após a morte
-player.CharacterAdded:Connect(function(char)
-    character = char
-    wait(1)
+-- Estado de ativação
+local parryEnabled = true
+toggleBtn.MouseButton1Click:Connect(function()
+    parryEnabled = not parryEnabled
+    toggleBtn.Text = "Auto Parry: " .. (parryEnabled and "ON" or "OFF")
 end)
+
+-- Campo de força visual
+local forcePart = Instance.new("Part")
+forcePart.Anchored = true
+forcePart.CanCollide = false
+forcePart.Shape = Enum.PartType.Ball
+forcePart.Transparency = 0.7
+forcePart.Material = Enum.Material.ForceField
+forcePart.Color = Color3.fromRGB(255, 0, 0)
+forcePart.Parent = workspace
+
+-- FPS monitor
+local fps = 60
+spawn(function()
+    while task.wait(1) do
+        local last = tick()
+        local count = 0
+        for i = 1, 60 do
+            task.wait()
+            count += 1
+        end
+        local delta = tick() - last
+        fps = math.floor(count / delta)
+        fpsLabel.Text = "FPS: " .. fps
+    end
+end)
+
+-- Parry função
+local function parry()
+    local vim = game:GetService("VirtualInputManager")
+    vim:SendKeyEvent(true, "F",
