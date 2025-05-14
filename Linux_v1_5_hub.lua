@@ -1,17 +1,11 @@
--- Arquivo: BladeBallAutoParry.lua
+-- Blade Ball Auto Parry Script - Linux v1.5
+-- Autor: ChatGPT + Você
 
---// Serviços e Jogador
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local VirtualInputManager = game:GetService("VirtualInputManager")
-local player = Players.LocalPlayer
-
---// GUI
-local gui = Instance.new("ScreenGui")
+local plr = game.Players.LocalPlayer
+local gui = Instance.new("ScreenGui", plr:WaitForChild("PlayerGui"))
 gui.Name = "Linuxv1_5"
-gui.ResetOnSpawn = false
-gui.Parent = player:WaitForChild("PlayerGui")
 
+-- Painel principal
 local frame = Instance.new("Frame", gui)
 frame.Size = UDim2.new(0, 240, 0, 180)
 frame.Position = UDim2.new(0, 10, 0, 10)
@@ -20,7 +14,6 @@ frame.BackgroundTransparency = 0.2
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
-frame.Visible = true
 
 local title = Instance.new("TextLabel", frame)
 title.Size = UDim2.new(1, 0, 0, 30)
@@ -45,122 +38,123 @@ fpsLabel.TextScaled = true
 fpsLabel.BackgroundTransparency = 1
 fpsLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
 
+-- Botão de minimizar/restaurar
+local toggleFrameBtn = Instance.new("TextButton", gui)
+toggleFrameBtn.Size = UDim2.new(0, 25, 0, 25)
+toggleFrameBtn.Position = UDim2.new(0, 255, 0, 10)
+toggleFrameBtn.Text = "-"
+toggleFrameBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+toggleFrameBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleFrameBtn.BorderSizePixel = 0
+
+local minimized = false
+toggleFrameBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    frame.Visible = not minimized
+    toggleFrameBtn.Text = minimized and "+" or "-"
+end)
+
+-- Botão de ativar parry
 local toggleBtn = Instance.new("TextButton", frame)
 toggleBtn.Size = UDim2.new(1, -20, 0, 30)
-toggleBtn.Position = UDim2.new(0, 10, 0, 130)
+toggleBtn.Position = UDim2.new(0, 10, 0, 110)
 toggleBtn.Text = "Auto Parry: ON"
 toggleBtn.TextScaled = true
 toggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleBtn.BorderSizePixel = 0
 
-local toggleUI = Instance.new("TextButton", gui)
-toggleUI.Size = UDim2.new(0, 100, 0, 30)
-toggleUI.Position = UDim2.new(0, 10, 0, 200)
-toggleUI.Text = "Mostrar GUI"
-toggleUI.TextScaled = true
-toggleUI.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-toggleUI.TextColor3 = Color3.fromRGB(255, 255, 255)
-toggleUI.BorderSizePixel = 0
-
-toggleUI.MouseButton1Click:Connect(function()
-    frame.Visible = not frame.Visible
-    toggleUI.Text = frame.Visible and "Ocultar GUI" or "Mostrar GUI"
-end)
-
--- Estado
 local parryEnabled = true
 toggleBtn.MouseButton1Click:Connect(function()
     parryEnabled = not parryEnabled
     toggleBtn.Text = "Auto Parry: " .. (parryEnabled and "ON" or "OFF")
 end)
 
--- Campo de força principal (área de detecção)
-local areaPart = Instance.new("Part")
-areaPart.Anchored = true
-areaPart.CanCollide = false
-areaPart.Shape = Enum.PartType.Ball
-areaPart.Transparency = 0.5
-areaPart.Material = Enum.Material.ForceField
-areaPart.Color = Color3.fromRGB(255, 255, 255)
-areaPart.Size = Vector3.new(30, 30, 30)
-areaPart.Parent = workspace
+-- Campo de força visual
+local forcePart = Instance.new("Part")
+forcePart.Anchored = true
+forcePart.CanCollide = false
+forcePart.Shape = Enum.PartType.Ball
+forcePart.Material = Enum.Material.ForceField
+forcePart.Color = Color3.fromRGB(255, 255, 255)
+forcePart.Transparency = 0.7
+forcePart.Size = Vector3.new(15, 15, 15)
+forcePart.Parent = workspace
 
--- Campo de impacto (área interna que ativa o parry)
-local triggerPart = Instance.new("Part")
-triggerPart.Anchored = true
-triggerPart.CanCollide = false
-triggerPart.Shape = Enum.PartType.Ball
-triggerPart.Transparency = 1
-triggerPart.Size = Vector3.new(8, 8, 8)
-triggerPart.Parent = workspace
-
--- FPS Monitor
+-- FPS monitor
 spawn(function()
     while task.wait(1) do
         local last = tick()
         local count = 0
-        for i = 1, 60 do RunService.Heartbeat:Wait() count += 1 end
+        for _ = 1, 60 do task.wait() count += 1 end
         local delta = tick() - last
         fpsLabel.Text = "FPS: " .. math.floor(count / delta)
     end
 end)
 
--- Parry função
+-- Parry universal (PC/Mobile)
+local UIS = game:GetService("UserInputService")
 local function parry()
-    VirtualInputManager:SendKeyEvent(true, "F", false, game)
-    RunService.Heartbeat:Wait()
-    VirtualInputManager:SendKeyEvent(false, "F", false, game)
+    if UIS.TouchEnabled and not UIS.KeyboardEnabled then
+        local blockBtn = plr:FindFirstChild("PlayerGui"):FindFirstChild("Block", true)
+        if blockBtn and (blockBtn:IsA("ImageButton") or blockBtn:IsA("TextButton")) then
+            pcall(function()
+                blockBtn:Activate()
+            end)
+        end
+    else
+        local vim = game:GetService("VirtualInputManager")
+        vim:SendKeyEvent(true, "F", false, game)
+        task.wait(0.05)
+        vim:SendKeyEvent(false, "F", false, game)
+    end
 end
 
 -- Loop principal
-RunService.Heartbeat:Connect(function()
-    local char = player.Character
+while task.wait(0.03) do
+    local char = plr.Character
     if not parryEnabled or not char or not char:FindFirstChild("HumanoidRootPart") then
-        areaPart.Transparency = 1
-        triggerPart.Transparency = 1
+        forcePart.Transparency = 1
         status.Text = "Parry: Inativo ou morto"
-        return
+        continue
     end
 
     local hrp = char.HumanoidRootPart
     local balls = workspace:FindFirstChild("Balls")
-    local focusBall = nil
-    local closestDist = math.huge
-
-    areaPart.Position = hrp.Position
-    triggerPart.Position = hrp.Position
+    local closest, minDist, velocity = nil, math.huge, nil
 
     if balls then
         for _, ball in ipairs(balls:GetChildren()) do
             if ball:IsA("BasePart") and ball.Color == Color3.fromRGB(255, 0, 0) then
                 local dist = (ball.Position - hrp.Position).Magnitude
-                if dist < closestDist then
-                    closestDist = dist
-                    focusBall = ball
+                local directionToPlayer = (hrp.Position - ball.Position).Unit
+                local ballDirection = ball.Velocity.Unit
+                local approaching = ball.Velocity.Magnitude > 10 and directionToPlayer:Dot(ballDirection) > 0.75
+                if dist < minDist and approaching then
+                    closest = ball
+                    minDist = dist
+                    velocity = ball.Velocity.Magnitude
                 end
             end
         end
     end
 
-    if focusBall then
-        areaPart.Color = Color3.fromRGB(255, 0, 0)
-        local dist = (focusBall.Position - hrp.Position).Magnitude
-        local velocity = focusBall.Velocity.Magnitude
+    if closest then
+        local radius = math.clamp(velocity / 5, 6, 30)
+        forcePart.Position = hrp.Position
+        forcePart.Size = Vector3.new(radius, radius, radius)
+        forcePart.Transparency = 0.3
+        forcePart.Color = Color3.fromRGB(255, 0, 0)
 
-        status.Text = "Parry: Aguardando impacto (" .. math.floor(dist) .. ")"
-
-        if dist <= triggerPart.Size.X / 2 then
-            local delay = math.clamp(1 - (velocity / 100), 0, 0.2)
-            task.delay(delay, function()
-                if (focusBall.Position - hrp.Position).Magnitude <= triggerPart.Size.X / 2 + 2 then
-                    parry()
-                    status.Text = "Parry: EXECUTADO"
-                end
-            end)
+        status.Text = "Parry: Pronto (" .. math.floor(minDist) .. ")"
+        if minDist <= radius then
+            parry()
+            status.Text = "Parry: EXECUTADO"
         end
     else
-        areaPart.Color = Color3.fromRGB(255, 255, 255)
-        status.Text = "Parry: Nenhuma bola focando"
+        forcePart.Position = hrp.Position
+        forcePart.Transparency = 0.7
+        forcePart.Color = Color3.fromRGB(255, 255, 255)
+        status.Text = "Parry: Aguardando bola"
     end
-end)
+end
