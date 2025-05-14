@@ -4,11 +4,14 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
+local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
 
 --// GUI
-local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+local gui = Instance.new("ScreenGui")
 gui.Name = "Linuxv1_5"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame", gui)
 frame.Size = UDim2.new(0, 240, 0, 180)
@@ -43,9 +46,17 @@ fpsLabel.TextScaled = true
 fpsLabel.BackgroundTransparency = 1
 fpsLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
 
+local logLabel = Instance.new("TextLabel", frame)
+logLabel.Size = UDim2.new(1, -10, 0, 25)
+logLabel.Position = UDim2.new(0, 5, 0, 95)
+logLabel.Text = "Log: Iniciado"
+logLabel.TextScaled = true
+logLabel.BackgroundTransparency = 1
+logLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+
 local toggleBtn = Instance.new("TextButton", frame)
 toggleBtn.Size = UDim2.new(1, -20, 0, 30)
-toggleBtn.Position = UDim2.new(0, 10, 0, 110)
+toggleBtn.Position = UDim2.new(0, 10, 0, 130)
 toggleBtn.Text = "Auto Parry: ON"
 toggleBtn.TextScaled = true
 toggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
@@ -67,14 +78,14 @@ toggleUI.MouseButton1Click:Connect(function()
     toggleUI.Text = frame.Visible and "Ocultar GUI" or "Mostrar GUI"
 end)
 
---// Estado
+-- Estado
 local parryEnabled = true
 toggleBtn.MouseButton1Click:Connect(function()
     parryEnabled = not parryEnabled
     toggleBtn.Text = "Auto Parry: " .. (parryEnabled and "ON" or "OFF")
 end)
 
---// Campo de força visual
+-- Campo de força visual
 local forcePart = Instance.new("Part")
 forcePart.Anchored = true
 forcePart.CanCollide = false
@@ -84,7 +95,7 @@ forcePart.Material = Enum.Material.ForceField
 forcePart.Color = Color3.fromRGB(255, 0, 0)
 forcePart.Parent = workspace
 
---// FPS Monitor
+-- FPS Monitor
 spawn(function()
     while task.wait(1) do
         local last = tick()
@@ -95,14 +106,23 @@ spawn(function()
     end
 end)
 
---// Função de parry (rápida)
+-- Parry seguro com fallback
 local function parry()
-    VirtualInputManager:SendKeyEvent(true, "F", false, game)
-    RunService.Heartbeat:Wait()
-    VirtualInputManager:SendKeyEvent(false, "F", false, game)
+    local success = pcall(function()
+        VirtualInputManager:SendKeyEvent(true, "F", false, game)
+        RunService.Heartbeat:Wait()
+        VirtualInputManager:SendKeyEvent(false, "F", false, game)
+    end)
+    if not success then
+        -- fallback
+        UserInputService.InputBegan:Fire({KeyCode = Enum.KeyCode.F, UserInputType = Enum.UserInputType.Keyboard})
+        logLabel.Text = "Log: Parry Fallback"
+    else
+        logLabel.Text = "Log: Parry OK"
+    end
 end
 
---// Loop principal
+-- Loop principal
 RunService.Heartbeat:Connect(function()
     local char = player.Character
     if not parryEnabled or not char or not char:FindFirstChild("HumanoidRootPart") then
@@ -118,15 +138,11 @@ RunService.Heartbeat:Connect(function()
     if balls then
         for _, ball in ipairs(balls:GetChildren()) do
             if ball:IsA("BasePart") then
-                local toPlayer = (hrp.Position - ball.Position).Unit
-                local ballVelocity = ball.Velocity
-                local dot = toPlayer:Dot(ballVelocity.Unit)
                 local dist = (ball.Position - hrp.Position).Magnitude
-
-                if dot > 0.7 and dist < minDist and ballVelocity.Magnitude > 10 then
+                if dist < minDist and ball.Velocity.Magnitude > 10 then
                     closest = ball
                     minDist = dist
-                    velocity = ballVelocity.Magnitude
+                    velocity = ball.Velocity.Magnitude
                 end
             end
         end
